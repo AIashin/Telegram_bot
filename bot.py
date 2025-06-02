@@ -10,7 +10,7 @@ import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TOKEN = os.getenv("7796351663:AAFzbqu8O5kl36mTtk8FQuzemtaX6PNdNPI")
+TOKEN = os.getenv("TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Пришли ссылку на Wildberries — я скажу цену 🛍")
