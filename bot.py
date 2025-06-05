@@ -10,30 +10,39 @@ import requests
 import openai
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-from telegram.ext import Dispatcher
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
+# === Переменные окружения ===
 TOKEN = os.getenv("TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# === Flask-приложение ===
 app = Flask(__name__)
-application = Application.builder().token(TOKEN).build()
-dispatcher = application.dispatcher
 
-# --- GPT функция
+# === Telegram Application ===
+application = Application.builder().token(TOKEN).build()
+
+# === GPT-функция ===
 def ask_gpt(prompt):
     openai.api_key = OPENAI_API_KEY
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # Или gpt-3.5-turbo
+        model="gpt-4",  # или gpt-3.5-turbo
         messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
     )
     return response["choices"][0]["message"]["content"]
 
-# --- Старт
+# === Хендлер: /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Пришли ссылку на Wildberries или опиши, что ищешь 👀")
+    await update.message.reply_text("Привет! Пришли ссылку на Wildberries или просто опиши, что ищешь 🛍")
 
-# --- Обработка текста
+# === Хендлер: сообщения ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -45,35 +54,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         product_id = match.group(1)
         try:
-            api_url = f"https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&dest=-1257786&nm={product_id}"
-            response = requests.get(api_url).json()
+            url = f"https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&dest=-1257786&nm={product_id}"
+            response = requests.get(url).json()
             product = response["data"]["products"][0]
             title = product["name"]
             price = product["salePriceU"] // 100
+
             await update.message.reply_text(f"🛒 {title}\n💰 Цена: {price} ₽")
         except Exception as e:
             await update.message.reply_text(f"⚠️ Ошибка: {e}")
     else:
-        gpt_response = ask_gpt(f"Пользователь ищет на Wildberries: {text}. Помоги интерпретировать запрос и дай совет.")
-        await update.message.reply_text(f"🤖 {gpt_response}")
+        gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
+        await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
 
-# --- Хендлеры
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+# === Добавляем хендлеры в Telegram-бот ===
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# --- Flask endpoint для Telegram
+# === Flask endpoint для Telegram Webhook ===
 @app.route(f"/{TOKEN}", methods=["POST"])
-def telegram_webhook():
+def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
     application.update_queue.put(update)
     return "ok"
 
-# --- Healthcheck
-@app.route("/")
-def home():
+# === Healthcheck для Render ===
+@app.route("/", methods=["GET"])
+def health():
     return "Бот жив!"
 
-# --- Запуск
+# === Запуск Flask-сервера ===
 if __name__ == "__main__":
     print("⚙️ Запуск Flask-сервера")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
