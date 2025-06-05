@@ -25,8 +25,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # === Flask-приложение ===
 app = Flask(__name__)
 
-# === Telegram Application (создаём, но НЕ запускаем)
+# === Telegram Application ===
 application = Application.builder().token(TOKEN).build()
+initialized = False  # <--- контроль, чтобы инициализировать один раз
 
 # === GPT-функция ===
 def ask_gpt(prompt):
@@ -62,33 +63,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text(f"🛒 {title}\n💰 Цена: {price} ₽")
         except Exception as e:
-            await update.message.reply_text(f"⚠️ Ошибка: {e}")
+            await update.message.reply_text(f"⚠️ Ошибка при получении данных: {e}")
     else:
-        gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
-        await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
+        try:
+            gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
+            await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ Ошибка GPT: {e}")
 
-# === Добавление хендлеров ===
+# === Хендлеры ===
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Webhook для Telegram ===
+# === Webhook ===
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
 
     async def process():
-        await application.initialize()  # 🧠 ключевой момент!
+        global initialized
+        if not initialized:
+            await application.initialize()
+            initialized = True
         await application.process_update(update)
 
     asyncio.run(process())
     return "ok"
 
-# === Healthcheck для Render ===
+# === Healthcheck ===
 @app.route("/", methods=["GET"])
 def health():
     return "Бот жив!"
 
-# === Запуск сервера ===
+# === Flask run ===
 if __name__ == "__main__":
     print("⚙️ Запуск Flask-сервера")
 
