@@ -3,7 +3,6 @@
 
 # In[1]:
 
-
 import os
 import re
 import requests
@@ -86,7 +85,15 @@ def health():
 # === Запуск Flask-сервера ===
 if __name__ == "__main__":
     print("⚙️ Запуск Flask-сервера")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+    port = os.environ.get("PORT")
+    if not port or port == "":
+        port = 5000
+    else:
+        port = int(port)
+
+    app.run(host="0.0.0.0", port=port)
+
 
 
 # In[ ]:
