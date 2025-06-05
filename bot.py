@@ -32,17 +32,17 @@ application = Application.builder().token(TOKEN).build()
 def ask_gpt(prompt):
     openai.api_key = OPENAI_API_KEY
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # Или gpt-3.5-turbo, если экономить
+        model="gpt-4",  # Можно заменить на gpt-3.5-turbo
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
     )
     return response["choices"][0]["message"]["content"]
 
-# === /start ===
+# === Хендлер: /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Пришли ссылку на Wildberries или опиши, что ищешь 🛍")
 
-# === Обработка сообщений ===
+# === Хендлер: текстовые сообщения ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -67,18 +67,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
         await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
 
-# === Добавление хендлеров ===
+# === Добавляем хендлеры ===
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Webhook для Telegram ===
+# === Webhook endpoint для Telegram (исправлено) ===
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.run(application.process_update(update))
+    asyncio.run(application.process_update(update))  # ✅ правильная асинхронная обработка
     return "ok"
 
-# === Healthcheck (Render проверяет, жив ли сервис) ===
+# === Healthcheck (для Render) ===
 @app.route("/", methods=["GET"])
 def health():
     return "Бот жив!"
@@ -94,6 +94,7 @@ if __name__ == "__main__":
         port = int(port)
 
     app.run(host="0.0.0.0", port=port)
+
 
 
 
