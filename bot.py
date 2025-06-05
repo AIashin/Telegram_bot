@@ -7,6 +7,7 @@ import os
 import re
 import requests
 import openai
+import asyncio
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import (
@@ -31,17 +32,17 @@ application = Application.builder().token(TOKEN).build()
 def ask_gpt(prompt):
     openai.api_key = OPENAI_API_KEY
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # или gpt-3.5-turbo
+        model="gpt-4",  # Или gpt-3.5-turbo, если экономить
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
     )
     return response["choices"][0]["message"]["content"]
 
-# === Хендлер: /start ===
+# === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Пришли ссылку на Wildberries или просто опиши, что ищешь 🛍")
+    await update.message.reply_text("Привет! Пришли ссылку на Wildberries или опиши, что ищешь 🛍")
 
-# === Хендлер: сообщения ===
+# === Обработка сообщений ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -66,18 +67,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
         await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
 
-# === Добавляем хендлеры в Telegram-бот ===
+# === Добавление хендлеров ===
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Flask endpoint для Telegram Webhook ===
+# === Webhook для Telegram ===
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put(update)
+    asyncio.run(application.process_update(update))
     return "ok"
 
-# === Healthcheck для Render ===
+# === Healthcheck (Render проверяет, жив ли сервис) ===
 @app.route("/", methods=["GET"])
 def health():
     return "Бот жив!"
@@ -93,6 +94,7 @@ if __name__ == "__main__":
         port = int(port)
 
     app.run(host="0.0.0.0", port=port)
+
 
 
 
