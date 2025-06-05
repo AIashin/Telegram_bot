@@ -6,7 +6,6 @@
 import os
 import re
 import requests
-import openai
 import asyncio
 from flask import Flask, request
 from telegram import Update
@@ -20,28 +19,17 @@ from telegram.ext import (
 
 # === Переменные окружения ===
 TOKEN = os.getenv("TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # === Flask-приложение ===
 app = Flask(__name__)
 
 # === Telegram Application ===
 application = Application.builder().token(TOKEN).build()
-initialized = False  # <--- контроль, чтобы инициализировать один раз
-
-# === GPT-функция ===
-def ask_gpt(prompt):
-    openai.api_key = OPENAI_API_KEY
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-    )
-    return response["choices"][0]["message"]["content"]
+initialized = False  # инициализация один раз
 
 # === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Пришли ссылку на Wildberries или опиши, что ищешь 🛍")
+    await update.message.reply_text("Привет! Пришли ссылку на Wildberries — я покажу цену 🛍")
 
 # === обработка сообщений ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -65,11 +53,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await update.message.reply_text(f"⚠️ Ошибка при получении данных: {e}")
     else:
-        try:
-            gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
-            await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
-        except Exception as e:
-            await update.message.reply_text(f"⚠️ Ошибка GPT: {e}")
+        await update.message.reply_text("👀 Пока что я умею только отвечать на ссылки Wildberries. GPT не подключён.")
 
 # === Хендлеры ===
 application.add_handler(CommandHandler("start", start))
