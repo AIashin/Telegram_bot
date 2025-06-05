@@ -25,24 +25,24 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # === Flask-приложение ===
 app = Flask(__name__)
 
-# === Telegram Application ===
+# === Telegram Application (создаём, но НЕ запускаем)
 application = Application.builder().token(TOKEN).build()
 
 # === GPT-функция ===
 def ask_gpt(prompt):
     openai.api_key = OPENAI_API_KEY
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # Можно заменить на gpt-3.5-turbo
+        model="gpt-4",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
     )
     return response["choices"][0]["message"]["content"]
 
-# === Хендлер: /start ===
+# === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Пришли ссылку на Wildberries или опиши, что ищешь 🛍")
 
-# === Хендлер: текстовые сообщения ===
+# === обработка сообщений ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -67,23 +67,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gpt_response = ask_gpt(f"Пользователь написал: '{text}'. Что он хочет найти на Wildberries?")
         await update.message.reply_text(f"🤖 GPT думает:\n{gpt_response}")
 
-# === Добавляем хендлеры ===
+# === Добавление хендлеров ===
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Webhook endpoint для Telegram (исправлено) ===
+# === Webhook для Telegram ===
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.run(application.process_update(update))  # ✅ правильная асинхронная обработка
+
+    async def process():
+        await application.initialize()  # 🧠 ключевой момент!
+        await application.process_update(update)
+
+    asyncio.run(process())
     return "ok"
 
-# === Healthcheck (для Render) ===
+# === Healthcheck для Render ===
 @app.route("/", methods=["GET"])
 def health():
     return "Бот жив!"
 
-# === Запуск Flask-сервера ===
+# === Запуск сервера ===
 if __name__ == "__main__":
     print("⚙️ Запуск Flask-сервера")
 
